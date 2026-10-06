@@ -167,7 +167,7 @@ class ScopeTests(unittest.TestCase):
             with self.assertRaises(ValueError):output_directory(self.root/'tdata')
             with self.assertRaises(ValueError):output_directory(self.root/'state'/'out')
             result=output_directory(self.root/'drive'/'TelegramDailyReader')
-            self.assertEqual(result,self.root/'drive'/'TelegramDailyReader')
+            self.assertEqual(result,(self.root/'drive'/'TelegramDailyReader').resolve())
             self.assertFalse(result.exists())
 
 

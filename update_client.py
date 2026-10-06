@@ -199,7 +199,7 @@ def update_lock(root):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+b') as file:
         file.seek(0)
-        if not file.read(1):
+        if os.fstat(file.fileno()).st_size == 0:
             file.write(b'0'); file.flush()
         file.seek(0)
         try:

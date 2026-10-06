@@ -202,7 +202,7 @@ class ReaderTests(unittest.TestCase):
         class Client:
             async def connect(s):raise FloodWaitError(request=None,capture=7200)
             async def disconnect(s):pass
-        with patch.dict(os.environ,{'TG_READER_TEST_STATE':str(self.root)}),patch('tgreader.auth.create_client',return_value=Client()) as factory:
+        with patch('tgreader.common.state_dir',return_value=self.root),patch('app.state_dir',return_value=self.root),patch('tgreader.auth.create_client',return_value=Client()) as factory:
             asyncio.run(app.collect())
             self.assertTrue((self.root/'telegram_cooldown.json').exists())
             factory.reset_mock();asyncio.run(app.collect());factory.assert_not_called()

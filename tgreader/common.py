@@ -39,7 +39,7 @@ def atomic_json(path, obj):
 def load_config():
     p = state_dir() / 'config.json'
     if not p.exists():
-        raise RuntimeError('Сначала запустите 1-desktop-setup.cmd.')
+        raise RuntimeError('Сначала подключите Telegram через окно TG Reader.')
     cfg = json.loads(p.read_text(encoding='utf-8'))
     ZoneInfo(cfg['timezone'])
     if not cfg.get('chats'):
@@ -84,7 +84,7 @@ class AlreadyRunning(Exception):
 def process_lock():
     with (state_dir() / 'collector.lock').open('a+b') as f:
         f.seek(0)
-        if not f.read(1):
+        if os.fstat(f.fileno()).st_size == 0:
             f.write(b'0'); f.flush()
         f.seek(0)
         try:

@@ -7,8 +7,8 @@
       "bytes": 108
     },
     ".github/workflows/windows.yml": {
-      "sha256": "50c95a57842e1654e6411a489b2c45f66e1f239100293e98d0b08fa07a143bac",
-      "bytes": 1613
+      "sha256": "045b1bdcaeeeb0f436bcbf9065a8fa078c9fb4741a4fa9d76faf8532520d2067",
+      "bytes": 1834
     },
     ".gitignore": {
       "sha256": "a2b5836b842799b49b8435212021fa6a9e94e3697d958310fb582fec7104e293",
@@ -131,12 +131,12 @@
       "bytes": 12226
     },
     "tests/test_reader.py": {
-      "sha256": "456803f9d9406d62e5b0738f046264f8500afc2e7d88d3f81b5820f91d0c8e90",
-      "bytes": 14082
+      "sha256": "c000f8a2c6e0848938d3458c097a3e0e3adba5d816dc85dd9c2955e0a35c3633",
+      "bytes": 14123
     },
     "tests/test_updates.py": {
-      "sha256": "cb075dcfdcf9d599b0cc078c8b6d0deec7f015d0d44d37e6f82bf5c0dd449b78",
-      "bytes": 10594
+      "sha256": "458ddf02e9ed6a4f16c9edd35fdaa3d18131591b7f42a960bd764c389bf6a3f3",
+      "bytes": 10686
     },
     "tgreader/__init__.py": {
       "sha256": "1551cf04691f85b4038bfcf7bf43e2289ad75ea5cec74bc65bfd556aa3498bb5",
@@ -151,8 +151,8 @@
       "bytes": 9704
     },
     "tgreader/common.py": {
-      "sha256": "ce49a175221b6aee60200981b806aca915c3046530c1a90f7948ca8de9dcc652",
-      "bytes": 3790
+      "sha256": "42d9d0d2fc0c6cd8d927c1d9c91777ef02f2c514e30cf29a2c5ebee8f4cc25ee",
+      "bytes": 3831
     },
     "tgreader/credentials.py": {
       "sha256": "9086c72620eb351c6f9c187b97989b9ca47dffc82ca5edb7cc2126fa858ff35b",
@@ -198,13 +198,17 @@
       "sha256": "35a70632f2d47b599075a42df16d1917b8f59a53b75f315e2037324a452551e1",
       "bytes": 1288
     },
+    "tools/verify_github_update.py": {
+      "sha256": "82230ba6c92aead2c73b16abc1419692e1f266aac94731abb70fd14b9f22dce8",
+      "bytes": 1569
+    },
     "update-network.py": {
       "sha256": "008b6ff11b2890bb3d2bd6edba5d212149bab20aa4cf4d33eb00e1d15ef7ee09",
       "bytes": 6418
     },
     "update_client.py": {
-      "sha256": "9ef9b6e7a8a33f3daa95c7d1fbec14a432ee243c4caf14edacd967a41daac034",
-      "bytes": 14470
+      "sha256": "b88a5b1aa430ea03c9395cccad4c832faeda489d8af954050c4fb063de7084ba",
+      "bytes": 14490
     },
     "vendor/async_timeout-5.0.1-py3-none-any.whl": {
       "sha256": "39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c",

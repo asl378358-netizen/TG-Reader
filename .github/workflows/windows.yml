@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
 concurrency:
   group: windows-main
   cancel-in-progress: true
@@ -44,6 +47,10 @@ jobs:
           OPENTELE_NO_FETCH: '1'
         run: |
           & .\tests\test_bootstrap.ps1 -TestPython (Get-Command python).Source
+      - name: Real GitHub download and update activation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/verify_github_update.py
       - name: Publish tested commit to stable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

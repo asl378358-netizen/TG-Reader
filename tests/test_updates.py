@@ -103,7 +103,9 @@ class UpdateTests(unittest.TestCase):
     def test_zip_traversal_links_case_collisions_and_oversize_are_rejected(self):
         for name in ('repo/../escape.py', 'repo/../../escape.py', '/absolute', 'repo/C:/evil', 'repo\\evil'):
             raw = io.BytesIO()
-            with zipfile.ZipFile(raw, 'w') as z: z.writestr(name, b'test')
+            with zipfile.ZipFile(raw, 'w') as z:
+                info = zipfile.ZipInfo('placeholder'); info.filename = name
+                z.writestr(info, b'test')
             with tempfile.TemporaryDirectory() as temp:
                 with self.assertRaises(u.UpdateError): u.unpack_archive(raw.getvalue(), Path(temp) / 'stage')
         raw = io.BytesIO()

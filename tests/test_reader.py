@@ -70,6 +70,19 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(self.store.job(CHAT['chat_id'],1)['status'],'done')
         self.assertEqual(self.store.get(CHAT['chat_id'],1)['collected_utc'],first['collected_utc'])
         self.assertEqual(len(self.store.day_messages(CHAT['chat_id'],first['day'])),1)
+    def test_edit_refresh_keeps_old_edits_without_rereading_new_history(self):
+        client=FakeClient(count=2)
+        with patch.object(client,'get_messages',wraps=client.get_messages) as requests:
+            asyncio.run(collect_chat(client,self.store,dict(CHAT),CFG))
+            self.assertFalse(any(call.kwargs.get('ids') for call in requests.call_args_list))
+        client.items[0].message='Updated old message'
+        client.items.append(message(3))
+        with patch.object(client,'get_messages',wraps=client.get_messages) as requests:
+            asyncio.run(collect_chat(client,self.store,dict(CHAT),CFG))
+            refresh=[call.kwargs['ids'] for call in requests.call_args_list if call.kwargs.get('ids')]
+        self.assertEqual(refresh,[[1,2]])
+        self.assertEqual(self.store.get(CHAT['chat_id'],1)['text'],'Updated old message')
+        self.assertEqual(self.store.cursor(CHAT['chat_id']),3)
     def test_changed_media_requeues_without_dropping_text(self):
         m=raw(1,kind='photo');self.store.put(m,advance=True);self.store.finish_job(CHAT['chat_id'],1,result={'assets':[]})
         m['media_fingerprint']='changed';m['text']='изменено';self.store.put(m)

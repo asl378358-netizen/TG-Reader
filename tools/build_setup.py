@@ -8,7 +8,7 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.3.1'
+VERSION = '0.3.2'
 EXCLUDE = {'TG-Reader-Setup.cmd', 'update-manifest.json', 'SOURCES_SHA256.txt'}
 
 

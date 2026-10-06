@@ -18,7 +18,7 @@ class ReaderWindow:
         self.busy = False
         self.queue = queue.Queue()
         self.buttons = []
-        window.title('TG Reader'); window.minsize(700, 560)
+        window.title('TG Reader'); window.minsize(700, 640)
         frame = ttk.Frame(window, padding=22); frame.pack(fill='both', expand=True)
         ttk.Label(frame, text='TG Reader', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
         self.version = tk.StringVar(value='Версия ' + record['version'])
@@ -28,6 +28,7 @@ class ReaderWindow:
         actions = ttk.Frame(frame); actions.pack(fill='x')
         for text, callback in [
             ('Подключить Telegram / выбрать группы', lambda: self.job('setup-desktop')),
+            ('Изменить выбранные группы', lambda: self.job('select-groups')),
             ('Собрать сейчас', lambda: self.job('collect')),
             ('Открыть состояние', self.open_status),
             ('Открыть папку выгрузок', self.open_exports),
@@ -57,7 +58,7 @@ class ReaderWindow:
 
     def job(self, command):
         if self.busy: return
-        if command in ('collect', 'schedule-enable') and not (self.root / 'config.json').exists():
+        if command in ('collect', 'schedule-enable', 'select-groups') and not (self.root / 'config.json').exists():
             messagebox.showinfo('TG Reader', 'Сначала подключите Telegram и выберите группы.'); return
         self.busy = True
         for button in self.buttons: button.state(['disabled'])
@@ -79,14 +80,26 @@ class ReaderWindow:
                                  '-File', str(self.source / 'schedule.ps1'), '-Mode', mode]
                 else:
                     arguments = [self.record['python'], str(self.source / 'app.py'), command]
-                self.queue.put(('status', 'Настройка Telegram…' if command == 'setup-desktop' else 'Выполняю сбор…'))
+                label = 'Настройка Telegram…' if command == 'setup-desktop' else ('Выбор групп…' if command == 'select-groups' else 'Выполняю сбор…')
+                self.queue.put(('status', label))
                 flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
                 process = subprocess.Popen(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, encoding='utf-8', errors='replace', env=self.updates.child_environment(), creationflags=flags)
-                for line in process.stdout:
-                    self.queue.put(('line', line.rstrip()))
+                if command == 'collect':
+                    with (self.root / 'last-collection.log').open('w', encoding='utf-8') as log:
+                        for line in process.stdout:
+                            log.write(line); log.flush()
+                            self.queue.put(('line', line.rstrip()))
+                else:
+                    for line in process.stdout:
+                        self.queue.put(('line', line.rstrip()))
                 code = process.wait()
-                result = 'Готово.' if code == 0 else 'Операция завершилась с ошибкой. Подробности ниже и в журнале.'
+                if command == 'collect' and code == 2:
+                    result = 'Сбор приостановлен Telegram. Время продолжения указано ниже.'
+                elif command == 'collect' and code == 3:
+                    result = 'Сбор частично завершён. Откройте состояние: есть ошибки или необработанные медиа.'
+                else:
+                    result = 'Готово.' if code == 0 else 'Операция завершилась с ошибкой. Подробности ниже и в журнале.'
                 self.queue.put(('done', (code, result)))
             except Exception as error:
                 logging.exception('Reader action failed')
@@ -105,7 +118,7 @@ class ReaderWindow:
                     self.version.set('Версия ' + self.record['version'])
                     self.busy = False
                     for button in self.buttons: button.state(['!disabled'])
-                    if code: messagebox.showerror('TG Reader', text)
+                    if code and code not in (2, 3): messagebox.showerror('TG Reader', text)
         except queue.Empty:
             pass
         self.window.after(100, self.poll)

@@ -9,38 +9,32 @@ from .common import atomic_json,state_dir,save_session,read_session
 from .network import client_network_options
 from .credentials import read_password
 from .setup_flow import setup_dialogs
+from .dialog_picker import choose_dialogs
 
-def choose_dialogs(dialogs,previous):
-    root=tk.Tk();root.title('Telegram Daily Reader — выбор групп');root.geometry('850x620')
-    ttk.Label(root,text='Выберите группы и каналы. Для первой проверки оставьте одну группу.',wraplength=790).pack(pady=12)
-    selected=set(c['chat_id'] for c in previous) or {-1003933265463}
-    search=tk.StringVar();entry=ttk.Entry(root,textvariable=search);entry.pack(fill='x',padx=15)
-    tree=ttk.Treeview(root,columns=('selected','name'),show='headings',selectmode='browse')
-    tree.heading('selected',text='Выбрано');tree.heading('name',text='Группа / канал');tree.column('selected',width=80,stretch=False);tree.column('name',width=710)
-    tree.pack(fill='both',expand=True,padx=15,pady=10)
-    rows={d.id:d for d in dialogs};mapping={};answer=[]
-    def redraw(*_):
-        tree.delete(*tree.get_children());mapping.clear()
-        for d in dialogs:
-            if search.get().casefold() in d.name.casefold():
-                iid=tree.insert('','end',values=('✓' if d.id in selected else '',d.name));mapping[iid]=d.id
-    def toggle(event=None):
-        iid=tree.identify_row(event.y) if event and event.type==tk.EventType.ButtonRelease else tree.focus()
-        if iid not in mapping:return
-        cid=mapping[iid]
-        if cid in selected:selected.remove(cid)
-        else:selected.add(cid)
-        tree.item(iid,values=('✓' if cid in selected else '',rows[cid].name))
-    def finish():
-        actual=[rows[cid] for cid in selected if cid in rows]
-        if not actual:messagebox.showerror('Нет выбора','Выберите хотя бы одну группу.');return
-        answer.extend(actual);root.destroy()
-    tree.bind('<ButtonRelease-1>',toggle);tree.bind('<space>',toggle)
-    search.trace_add('write',redraw)
-    ttk.Button(root,text='Продолжить',command=finish).pack(pady=12)
-    redraw();root.mainloop()
-    if not answer:raise RuntimeError('Настройка отменена; выбор групп не сохранен.')
-    return answer
+
+def chat_records(dialogs):
+    return [{'chat_id':dialog.id,'title':dialog.name,
+             'peer_type':'channel' if hasattr(dialog.entity,'access_hash') else 'chat',
+             'peer_id':dialog.entity.id,'access_hash':getattr(dialog.entity,'access_hash',None),
+             'forum':bool(getattr(dialog.entity,'forum',False))} for dialog in dialogs]
+
+
+async def select_groups():
+    from .auth import create_client,persist_client,verify_account
+    from .common import load_config
+    cfg=load_config();client=create_client(cfg);verified=False
+    print('Используем сохранённый вход Telegram. Получаем список групп для поиска...',flush=True)
+    try:
+        await client.connect();await verify_account(client,cfg);verified=True
+        dialogs=await setup_dialogs(client,rpc_waits_handled=True)
+        selected=choose_dialogs(dialogs,cfg['chats'],cfg['timezone'])
+        cfg['chats']=chat_records(selected)
+        atomic_json(state_dir()/'config.json',cfg)
+        print(f'Список групп сохранён: {len(selected)}. Вход и папка выгрузок сохранены.',flush=True)
+    finally:
+        try:
+            if verified:persist_client(client,cfg)
+        finally:await client.disconnect()
 
 async def setup():
     state=state_dir();p=state/'config.json';old=json.loads(p.read_text(encoding='utf-8')) if p.exists() else {}
@@ -57,7 +51,7 @@ async def setup():
                password=lambda:read_password('Пароль двухэтапной проверки Telegram','Введите облачный пароль двухэтапной проверки этого аккаунта.'))
         save_session(client.session.save())
         dialogs=await setup_dialogs(client)
-        choices=choose_dialogs(dialogs,old.get('chats',[]))
+        choices=choose_dialogs(dialogs,old.get('chats',[]),old.get('timezone','Europe/Berlin'))
         root=tk.Tk();root.withdraw()
         folder=filedialog.askdirectory(title='Выберите синхронизируемую папку Google Диска')
         root.destroy()

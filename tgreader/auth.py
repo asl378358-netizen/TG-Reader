@@ -37,8 +37,8 @@ def read_bundle(cfg):
     return value
 
 
-def identity_client(session, identity, *, receive_updates=False, network=None):
-    client = TelegramClient(session, identity['api_id'], identity['api_hash'],
+def identity_client(session, identity, *, receive_updates=False, network=None, client_type=TelegramClient):
+    client = client_type(session, identity['api_id'], identity['api_hash'],
         device_model=identity['device_model'], system_version=identity['system_version'],
         app_version=identity['app_version'], lang_code=identity['lang_code'],
         system_lang_code=identity['system_lang_code'], receive_updates=receive_updates,
@@ -49,10 +49,11 @@ def identity_client(session, identity, *, receive_updates=False, network=None):
 
 
 def create_client(cfg):
+    from .collection_flow import CollectionClient
     if cfg.get('auth_mode') == 'desktop':
         value = read_bundle(cfg)
-        return identity_client(StringSession(value['session']), value['identity'])
-    return TelegramClient(StringSession(read_session()), cfg['api_id'], cfg['api_hash'],
+        return identity_client(StringSession(value['session']), value['identity'], client_type=CollectionClient)
+    return CollectionClient(StringSession(read_session()), cfg['api_id'], cfg['api_hash'],
         device_model='Telegram Daily Reader', app_version='0.2.0', receive_updates=False,
         **client_network_options())
 
@@ -68,9 +69,11 @@ def persist_client(client, cfg):
 
 
 async def verify_account(client, cfg):
-    if not await client.is_user_authorized():
-        raise RuntimeError('Telegram завершил сеанс. Снова запустите 1-desktop-setup.cmd.')
+    # get_me alone verifies the session and account; is_user_authorized catches
+    # RPCError (including FloodWait) and can misreport a wait as a lost session.
+    me = await client.get_me()
+    if not me:
+        raise RuntimeError('Telegram завершил сеанс. Нажмите «Подключить Telegram / выбрать группы».')
     if cfg.get('account_user_id'):
-        me = await client.get_me()
-        if not me or me.id != cfg['account_user_id']:
+        if me.id != cfg['account_user_id']:
             raise RuntimeError('Выбран другой аккаунт. Сбор остановлен; повторите настройку.')

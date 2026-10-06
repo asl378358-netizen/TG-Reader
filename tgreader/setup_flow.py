@@ -1,6 +1,7 @@
 """Wait for Telegram limits without discarding login or dialog pagination."""
 import asyncio
 from telethon.errors import FloodWaitError
+from telethon.tl import types
 
 
 async def wait_for_telegram(seconds, label):
@@ -29,14 +30,16 @@ async def setup_rpc(operation, label):
     raise RuntimeError('Telegram неоднократно ограничил запросы. Повторите настройку позже.')
 
 
-async def setup_dialogs(client):
+async def setup_dialogs(client, *, rpc_waits_handled=False):
     print('Вход выполнен. Получаем список групп и каналов...', flush=True)
     iterator = client.iter_dialogs().__aiter__()
     result = []
     while True:
         try:
-            dialog = await setup_rpc(iterator.__anext__, 'получение списка чатов')
+            dialog = await iterator.__anext__() if rpc_waits_handled else await setup_rpc(iterator.__anext__, 'получение списка чатов')
         except StopAsyncIteration:
             return result
-        if dialog.is_group or dialog.is_channel:
+        if dialog.is_group or dialog.is_channel or isinstance(dialog.entity,(types.ChannelForbidden,types.ChatForbidden)):
             result.append(dialog)
+            if len(result)%100==0:
+                print(f'Загружено групп и каналов: {len(result)}...',flush=True)

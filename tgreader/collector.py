@@ -6,6 +6,7 @@ from telethon import utils
 from telethon.errors import FloodWaitError
 from telethon.tl import functions, types
 from .common import UTC, iso, now
+from .collection_flow import LOG, request_name
 
 def media_kind(m):
     if isinstance(getattr(m,'media',None),types.MessageMediaPhoto):return 'photo'
@@ -102,6 +103,8 @@ async def collect_chat(client,store,chat,cfg):
     cid=chat['chat_id'];peer=input_peer(chat);health=store.health(cid)
     health.update({'chat_id':cid,'title':chat['title'],'attempt_utc':iso(now()),'collection_error':None,'telegram_resume_utc':None})
     try:
+        print(f'Читаем группу: {chat["title"]}.',flush=True)
+        LOG.info('Group collection started cursor=%s forum=%s',store.cursor(cid),chat.get('forum',False))
         entity=await client.get_entity(peer)
         chat.update(title=entity.title,forum=bool(getattr(entity,'forum',False)))
         if chat['forum']:
@@ -126,6 +129,8 @@ async def collect_chat(client,store,chat,cfg):
                 if not cursor and m.date<since:continue
                 store.put(normalize(m,chat,catalog,cfg['timezone']),advance=True)
                 count+=1
+                if count % 50 == 0:
+                    print(f'{chat["title"]}: сохранено {count} новых сообщений.',flush=True)
         # Empty windows must not repeatedly scan ancient history.
         if high and store.cursor(cid)<high:
             # Only after successful traversal: higher IDs might be service/deleted messages.
@@ -142,12 +147,13 @@ async def collect_chat(client,store,chat,cfg):
                 if m and getattr(m,'date',None):
                     found.add(m.id);store.put(normalize(m,chat,catalog,cfg['timezone']),context_only=True);context_count+=1
             for mid in set(missing)-found:store.unavailable_context(cid,mid)
-        # Re-read collected messages in the last 48 hours to capture edits.
+        # Refresh older records for edits. Messages just read from history
+        # already have their current text: rereading them doubles first-run RPCs.
         cutoff=now()-dt.timedelta(hours=cfg.get('edit_refresh_hours',48))
         recent=[]
         for row in store.db.execute('SELECT id,payload FROM messages WHERE chat_id=? AND day>=?',(cid,cutoff.astimezone(ZoneInfo(cfg['timezone'])).date().isoformat())):
             payload=__import__('json').loads(row['payload'])
-            if payload['date_utc']>=iso(cutoff):recent.append(row['id'])
+            if row['id']<=cursor and payload['date_utc']>=iso(cutoff):recent.append(row['id'])
         for i in range(0,len(recent),100):
             updates=await client.get_messages(peer,ids=recent[i:i+100])
             for m in updates:
@@ -156,12 +162,14 @@ async def collect_chat(client,store,chat,cfg):
                        'new_messages_last_run':count,'context_added_last_run':context_count,
                        'tracking_started_utc':health['tracking_started_utc']})
         print(f'{chat["title"]}: новых сообщений {count}, контекст {context_count}',flush=True)
+        LOG.info('Group collection finished new_messages=%s context=%s cursor=%s',count,context_count,store.cursor(cid))
     except FloodWaitError as e:
-        health['collection_error']=f'{type(e).__name__}: Telegram попросил подождать {e.seconds} секунд.'
+        health['collection_error']=f'{type(e).__name__}: {request_name(e.request)}; Telegram попросил подождать {e.seconds} секунд.'
         store.set_health(cid,health)
         raise
     except Exception as e:
         health['collection_error']=f'{type(e).__name__}: {e}'
+        LOG.error('Group collection failed type=%s cursor=%s',type(e).__name__,store.cursor(cid))
         print(f'{chat["title"]}: ошибка чтения {type(e).__name__}',flush=True)
     store.set_health(cid,health)
     return health

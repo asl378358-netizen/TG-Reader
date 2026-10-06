@@ -240,7 +240,7 @@ async def setup_desktop():
 
         dialogs = await setup_dialogs(client)
         previous = old.get('chats', []) if old.get('account_user_id') == me.id else []
-        choices = choose_dialogs(dialogs, previous)
+        choices = choose_dialogs(dialogs, previous, old.get('timezone','Europe/Berlin'))
         root = tk.Tk(); root.withdraw()
         try:
             folder = filedialog.askdirectory(title='Выберите синхронизируемую папку Google Диска')

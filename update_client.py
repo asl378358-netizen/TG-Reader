@@ -135,7 +135,7 @@ class GitHubClient:
 
 def safe_name(name):
     path = PurePosixPath(name)
-    if not name or '\\' in name or ':' in name or path.is_absolute() or any(p in ('', '.', '..') for p in name.split('/')):
+    if not name or '\x00' in name or '\\' in name or ':' in name or path.is_absolute() or any(p in ('', '.', '..') for p in name.split('/')):
         raise UpdateError('Недопустимый путь в пакете обновления.')
     return path
 
@@ -150,8 +150,11 @@ def unpack_archive(data, destination):
             raise UpdateError('Пакет обновления слишком большой.')
         roots = set()
         for entry in entries:
-            name = entry.filename.rstrip('/')
+            # ZipInfo normalizes backslashes on Windows; validate the raw name first.
+            name = entry.orig_filename.rstrip('/')
             path = safe_name(name)
+            if name != entry.filename.rstrip('/'):
+                raise UpdateError('Некорректное имя файла в пакете обновления.')
             roots.add(path.parts[0])
             if stat.S_ISLNK(entry.external_attr >> 16):
                 raise UpdateError('Ссылки в пакете обновления не допускаются.')

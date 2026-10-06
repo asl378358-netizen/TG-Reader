@@ -21,11 +21,13 @@ def main():
         print('Main advanced; newer CI will publish stable.')
         return
     try:
-        request('git/refs/heads/stable', 'PATCH', {'sha': sha, 'force': False})
+        request('git/ref/heads/stable')
     except urllib.error.HTTPError as error:
         if error.code != 404:
             raise
         request('git/refs', 'POST', {'ref': 'refs/heads/stable', 'sha': sha})
+    else:
+        request('git/refs/heads/stable', 'PATCH', {'sha': sha, 'force': False})
     print('Stable published:', sha)
 
 

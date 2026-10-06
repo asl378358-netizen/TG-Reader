@@ -195,8 +195,8 @@
       "bytes": 3172
     },
     "tools/promote_stable.py": {
-      "sha256": "35a70632f2d47b599075a42df16d1917b8f59a53b75f315e2037324a452551e1",
-      "bytes": 1288
+      "sha256": "5723d391825426c7045efa189fbdf057423c9c4844a58e8a4aab10fafd5ca664",
+      "bytes": 1338
     },
     "tools/verify_github_update.py": {
       "sha256": "82230ba6c92aead2c73b16abc1419692e1f266aac94731abb70fd14b9f22dce8",
@@ -207,8 +207,8 @@
       "bytes": 6418
     },
     "update_client.py": {
-      "sha256": "b88a5b1aa430ea03c9395cccad4c832faeda489d8af954050c4fb063de7084ba",
-      "bytes": 14490
+      "sha256": "37c759f90c6895bb12ee5eb8d525a8e2819c01569a7ffa2ebc15e7b3b8a84c35",
+      "bytes": 14768
     },
     "vendor/async_timeout-5.0.1-py3-none-any.whl": {
       "sha256": "39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c",

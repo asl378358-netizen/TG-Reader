@@ -7,7 +7,7 @@ import sys
 import webbrowser
 from pathlib import Path
 from tgreader.common import AlreadyRunning,atomic_json,load_config,process_lock,state_dir,iso,now
-from tgreader.collection_flow import LOG,MAX_SHORT_WAIT,local_resume,request_name,wait_for_collection
+from tgreader.collection_flow import CollectionProgress,LOG,MAX_SHORT_WAIT,local_resume,request_name,wait_for_collection
 
 def logging_setup():
     handler=RotatingFileHandler(state_dir()/'collector.log',maxBytes=2*1024*1024,backupCount=3,encoding='utf-8')
@@ -42,6 +42,7 @@ async def collect():
         phase='подключение'
         print('Подключаемся к Telegram...',flush=True)
         client=create_client(cfg)
+        client.collection_progress=CollectionProgress()
         await client.connect()
         phase='проверка аккаунта'
         await verify_account(client,cfg)
@@ -53,6 +54,7 @@ async def collect():
             if health.get('collection_error'):result=3
         phase='скачивание и обработка медиа'
         print('Чтение групп завершено. Обрабатываем фотографии, голосовые и кружочки...',flush=True)
+        client.collection_progress.set_phase(phase)
         await process_jobs(client,store,cfg['chats'],state,cfg)
         if store.pending_jobs([chat['chat_id'] for chat in cfg['chats']],1):result=3
     except FloodWaitError as e:

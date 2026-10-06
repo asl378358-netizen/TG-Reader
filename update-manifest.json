@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "files": {
     ".gitattributes": {
       "sha256": "6e3cd734f4c7fb87509b27c0199dd8eb78f542825935bcc0fdfc07f0866c9a4e",
@@ -75,24 +75,24 @@
       "bytes": 3613
     },
     "README.md": {
-      "sha256": "589e47e8d1595a72bb989c395d6f841d36fd62ebb5c1c9d06fbee10747e418dc",
-      "bytes": 8927
+      "sha256": "8a43e071fa51caf8cdefb97d96e30d1ebd419cc056512e19b4127e53ef8ba0cf",
+      "bytes": 11580
     },
     "START_HERE.txt": {
-      "sha256": "dd8516af863901f4f49c53df950dccedab364f981870b5e23777df0d80356ed7",
-      "bytes": 3144
+      "sha256": "f916349e3b0aafd1078e76279859514c17a78fd251a8b7105166fc60ce3eb362",
+      "bytes": 3522
     },
     "VALIDATION.txt": {
-      "sha256": "50185f0033315a6a6fec18c175502b8b3d527a8ee8d3f434bdf4e365c8ffee9a",
-      "bytes": 20984
+      "sha256": "3f096756eb3a8f739b1945caec49378582ec20c328eb88f832d3b6b7d3d6cf09",
+      "bytes": 23386
     },
     "VENDOR_NOTICES.txt": {
       "sha256": "7120085ecca750b1b5e1aa1f2e42e4930dd06547403693c2c5600bf27f3b6bc1",
       "bytes": 732
     },
     "app.py": {
-      "sha256": "c813baed2e4d0e1e93a9b69424608f6fead29af18b1677776cc754497da10bd2",
-      "bytes": 7143
+      "sha256": "145b01b5f54d929a94dd69c89846c5813da915734c1b225e423196f5314e4fed",
+      "bytes": 7270
     },
     "install.ps1": {
       "sha256": "166c6735f7f6548f1f923f0a0980ffbdb72d600b0742304e69e72391015fb17e",
@@ -115,8 +115,8 @@
       "bytes": 4819
     },
     "tests/test_collection_flow.py": {
-      "sha256": "cb4e2356c925b874c17542f5e6148d4642ecb876af24362cc17fa7d56b8edf21",
-      "bytes": 15039
+      "sha256": "4a84ae7ec73ba406839c104d306cd2892c1a40d979ff586612976bb61b82fccd",
+      "bytes": 16859
     },
     "tests/test_desktop.py": {
       "sha256": "aab19c1126257173a5649bc8e620dec94cebe5f27111d024e25cba35fedcca63",
@@ -138,13 +138,17 @@
       "sha256": "50e6354a29fb65e9c0869600095197cd4cf3017e80cdcd2e827a7742369e9cee",
       "bytes": 10769
     },
+    "tests/test_media_flow.py": {
+      "sha256": "8ac711649584b447d302fbf274b3d7012b3bf1d82a5d394014e0bc6333d301aa",
+      "bytes": 7026
+    },
     "tests/test_network.py": {
       "sha256": "3fa8e0c6bd03cb7a9cf7b2e65ba672ee14af865e1cc049fa4555114f6a712dea",
       "bytes": 12226
     },
     "tests/test_reader.py": {
-      "sha256": "9efa3775b8f12b62baa1f344f8d50de346e59c0ff1520e9d1fcedb29b80dc50b",
-      "bytes": 15043
+      "sha256": "3cb25ee9647d5c87d906c40e6d0d34b9bf0053ae7aa3a772ec021dc503de3128",
+      "bytes": 15382
     },
     "tests/test_updates.py": {
       "sha256": "458ddf02e9ed6a4f16c9edd35fdaa3d18131591b7f42a960bd764c389bf6a3f3",
@@ -159,12 +163,12 @@
       "bytes": 3637
     },
     "tgreader/collection_flow.py": {
-      "sha256": "96f05392cea11f87c50d6d989646516c829642f07a3c1a5007045b637e09879a",
-      "bytes": 3038
+      "sha256": "b71643e7ae4bb0f31129669238b095a175fb540e7be3d62a7bddafa802e902c8",
+      "bytes": 5797
     },
     "tgreader/collector.py": {
-      "sha256": "4463fadd2add869ca718e2015cc38f236b0a42e7615ceaf4c0cf786fd92b3f47",
-      "bytes": 10431
+      "sha256": "f07189fdbe0a3585b0414ac81e0fec8edc1348158e4dd481abfeef0f5b55b0bb",
+      "bytes": 11197
     },
     "tgreader/common.py": {
       "sha256": "42d9d0d2fc0c6cd8d927c1d9c91777ef02f2c514e30cf29a2c5ebee8f4cc25ee",
@@ -183,8 +187,8 @@
       "bytes": 14396
     },
     "tgreader/media.py": {
-      "sha256": "b0e88dd005c6fbb0386588157eeb0e05e19ebd397d5285da75a0c3f6e387af01",
-      "bytes": 8019
+      "sha256": "9a75e23cf5fe385a526c2e37529ea3880f84ce254ca95888e0e103c77573abe8",
+      "bytes": 13494
     },
     "tgreader/network.py": {
       "sha256": "3de6d8beb05fb02bd6b4145b99b855f130936a1e32ff3a89da61a41c1a63f892",
@@ -211,7 +215,7 @@
       "bytes": 6229
     },
     "tools/build_setup.py": {
-      "sha256": "b00fe8c1f88b31e2d2bb936aaf8f1178e40e711a77ce84800ed35510c7b5317f",
+      "sha256": "d102e11c09fefaaa161eaddb26633a0c7f6d2e3e5ec900531449fa807ff1960d",
       "bytes": 3273
     },
     "tools/promote_stable.py": {

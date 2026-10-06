@@ -101,9 +101,11 @@ async def fetch_topics(client,peer):
 
 async def collect_chat(client,store,chat,cfg):
     cid=chat['chat_id'];peer=input_peer(chat);health=store.health(cid)
+    progress=getattr(client,'collection_progress',None)
     health.update({'chat_id':cid,'title':chat['title'],'attempt_utc':iso(now()),'collection_error':None,'telegram_resume_utc':None})
     try:
         print(f'Читаем группу: {chat["title"]}.',flush=True)
+        if progress:progress.set_phase(f'{chat["title"]}: сведения о группе и темах')
         LOG.info('Group collection started cursor=%s forum=%s',store.cursor(cid),chat.get('forum',False))
         entity=await client.get_entity(peer)
         chat.update(title=entity.title,forum=bool(getattr(entity,'forum',False)))
@@ -122,6 +124,7 @@ async def collect_chat(client,store,chat,cfg):
         since=started-dt.timedelta(days=cfg.get('bootstrap_days',3))
         if 'tracking_started_utc' not in health:health['tracking_started_utc']=iso(since)
         count=0
+        if progress:progress.set_phase(f'{chat["title"]}: история, до 100 сообщений за запрос')
         if high>cursor:
             async for m in client.iter_messages(peer,limit=None,min_id=cursor,max_id=high+1,
                     reverse=True,offset_date=since if not cursor else None,wait_time=1):
@@ -129,7 +132,8 @@ async def collect_chat(client,store,chat,cfg):
                 if not cursor and m.date<since:continue
                 store.put(normalize(m,chat,catalog,cfg['timezone']),advance=True)
                 count+=1
-                if count % 50 == 0:
+                if progress:progress.saved()
+                elif count % 50 == 0:
                     print(f'{chat["title"]}: сохранено {count} новых сообщений.',flush=True)
         # Empty windows must not repeatedly scan ancient history.
         if high and store.cursor(cid)<high:
@@ -138,14 +142,17 @@ async def collect_chat(client,store,chat,cfg):
                 store.db.execute('INSERT INTO cursors VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET id=MAX(id,excluded.id)',(cid,high))
         # Capture parent chains in batches. Unfinished work stays durable for the next run.
         context_count=0
+        if progress:progress.set_phase(f'{chat["title"]}: контекст ответов')
         for _ in range(5):
             missing=store.missing(cid,100)
             if not missing:break
+            print(f'Контекст ответов: запрашиваем {len(missing)} сообщений одной порцией.',flush=True)
             parents=await client.get_messages(peer,ids=missing)
             found=set()
             for m in parents:
                 if m and getattr(m,'date',None):
                     found.add(m.id);store.put(normalize(m,chat,catalog,cfg['timezone']),context_only=True);context_count+=1
+                    if progress:progress.saved(context=True)
             for mid in set(missing)-found:store.unavailable_context(cid,mid)
         # Refresh older records for edits. Messages just read from history
         # already have their current text: rereading them doubles first-run RPCs.
@@ -155,6 +162,7 @@ async def collect_chat(client,store,chat,cfg):
             payload=__import__('json').loads(row['payload'])
             if row['id']<=cursor and payload['date_utc']>=iso(cutoff):recent.append(row['id'])
         for i in range(0,len(recent),100):
+            if progress:progress.set_phase(f'{chat["title"]}: проверка правок, порция {len(recent[i:i+100])}')
             updates=await client.get_messages(peer,ids=recent[i:i+100])
             for m in updates:
                 if m and getattr(m,'date',None):store.put(normalize(m,chat,catalog,cfg['timezone']),context_only=True)

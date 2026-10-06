@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace as N
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock,patch
 import zipfile
 from telethon.tl import types
 from telethon.errors import FloodWaitError
@@ -185,7 +185,7 @@ class ReaderTests(unittest.TestCase):
         m=message(1);m.document=N(attributes=[types.DocumentAttributeAudio(3,voice=True)],mime_type='audio/ogg')
         self.store.put(raw(1,kind='voice'),advance=True)
         class Client:
-            async def get_messages(self,peer,ids):return m
+            async def get_messages(self,peer,ids):return [m]
             async def download_media(self,m,file):Path(file).write_bytes(src.read_bytes());return file
         cfg={**CFG,'output_dir':str(self.root/'output')}
         with patch.object(MediaProcessor,'transcribe',side_effect=RuntimeError('offline model')):
@@ -194,9 +194,13 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(job['status'],'error')
         self.assertTrue((Path(cfg['output_dir'])/job['result']['original_relative_path']).exists())
         self.assertEqual(self.store.cursor(CHAT['chat_id']),1)
+        retry=Client()
+        retry.get_messages=AsyncMock(side_effect=AssertionError('Cached voice must not be fetched again'))
+        retry.download_media=AsyncMock(side_effect=AssertionError('Cached voice must not be downloaded again'))
         with patch.object(MediaProcessor,'transcribe',return_value={'text':'распознано'}):
-            asyncio.run(process_jobs(Client(),self.store,[CHAT],self.root,cfg))
+            asyncio.run(process_jobs(retry,self.store,[CHAT],self.root,cfg))
         self.assertEqual(self.store.job(CHAT['chat_id'],1)['status'],'done')
+        retry.get_messages.assert_not_called();retry.download_media.assert_not_called()
     def test_media_flood_wait_stops_other_requests_and_keeps_queue(self):
         for mid in (1,2):self.store.put(raw(mid,kind='voice'))
         class Client:

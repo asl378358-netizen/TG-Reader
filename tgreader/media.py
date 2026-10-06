@@ -1,13 +1,42 @@
 import asyncio
 import hashlib
 import json
+import logging
 import math
 import mimetypes
 import os
 import shutil
+import threading
+import time
 from pathlib import Path
 from PIL import Image, ImageOps
 from .common import atomic_json, iso, now
+from .collection_flow import LOG
+
+
+class PublicModelNotice(logging.Filter):
+    def filter(self, record):
+        # Replace this advisory with a short Russian explanation. Keep errors
+        # and other warnings: authentication is optional for this public model.
+        return not (record.levelno == logging.WARNING and
+                    record.getMessage().startswith('You are sending unauthenticated requests to the HF Hub'))
+
+
+def model_cache_bytes(directory):
+    total=0
+    for path in Path(directory).rglob('*'):
+        try:
+            if path.is_file() and not path.is_symlink():total+=path.stat().st_size
+        except OSError:
+            pass  # A download may atomically rename a cache file during scanning.
+    return total
+
+
+def model_wait_notice(stopped,directory,started):
+    while not stopped.wait(10):
+        megabytes=model_cache_bytes(directory)/(1024*1024)
+        print(f'Модель речи: подготовка идёт {int(time.monotonic()-started)} с; '
+              f'в папке модели {megabytes:.1f} МБ. Ожидаем завершения загрузки и открытия модели.',flush=True)
 
 def small_image(source,target):
     target=Path(target);target.parent.mkdir(parents=True,exist_ok=True)
@@ -49,14 +78,30 @@ def extract_frames(source,directory):
 
 class MediaProcessor:
     def __init__(self,state,cfg):
-        self.state=Path(state);self.cfg=cfg;self.model=None
+        self.state=Path(state);self.cfg=cfg;self.model=None;self.model_error=None
     def model_instance(self):
+        if self.model_error is not None:raise self.model_error
         if self.model is None:
             os.environ['HF_HOME']=str(self.state/'models')
+            os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING']='1'
             from faster_whisper import WhisperModel
-            print('Загрузка локальной модели речи; при первом запуске скачиваются веса.',flush=True)
-            self.model=WhisperModel(self.cfg.get('whisper_model','small'),device='cpu',compute_type='int8',
-                                   cpu_threads=min(4,os.cpu_count() or 2),download_root=str(self.state/'models'))
+            for name,logger in list(logging.Logger.manager.loggerDict.items()):
+                if name.startswith('huggingface_hub') and isinstance(logger,logging.Logger):
+                    if not any(isinstance(f,PublicModelNotice) for f in logger.filters):logger.addFilter(PublicModelNotice())
+            print('Подготовка локальной модели речи. При первом запуске скачиваются веса; '
+                  'публичная модель не требует аккаунта или токена. Сохранённые сообщения уже в базе.',flush=True)
+            stopped=threading.Event();started=time.monotonic()
+            worker=threading.Thread(target=model_wait_notice,args=(stopped,self.state/'models',started),daemon=True);worker.start()
+            try:
+                self.model=WhisperModel(self.cfg.get('whisper_model','small'),device='cpu',compute_type='int8',
+                                       cpu_threads=min(4,os.cpu_count() or 2),download_root=str(self.state/'models'))
+            except Exception as error:
+                self.model_error=error
+                print('Не удалось подготовить модель речи. Оригиналы сохранены; ошибка будет записана в журнал.',flush=True)
+                raise
+            finally:
+                stopped.set();worker.join(timeout=1)
+            print('Локальная модель речи готова. Начинаем расшифровку.',flush=True)
         return self.model
     def transcribe(self,path):
         from faster_whisper.audio import decode_audio
@@ -87,25 +132,62 @@ class MediaProcessor:
         result['assets']=[str(p.relative_to(self.state)).replace('\\','/') for p in assets]
         return result
 
+def original_path(state,job,payload,kind):
+    mime=payload.get('media_mime_type') or ''
+    ext='.jpg' if kind=='photo' else ('.ogg' if kind=='voice' else '.mp4')
+    if kind=='photo' and mime:ext={'image/png':'.png','image/webp':'.webp','image/jpeg':'.jpg','image/gif':'.gif'}.get(mime,'.image')
+    return Path(state)/'originals'/f'chat_{abs(job["chat_id"])}'/f'{job["id"]}_{job["fingerprint"]}{ext}'
+
+
 async def process_jobs(client,store,chats,state,cfg):
     from telethon.errors import FloodWaitError
     from .collector import input_peer,media_kind
     processor=MediaProcessor(state,cfg);allowed={c['chat_id']:c for c in chats}
     jobs=store.pending_jobs(list(allowed),cfg.get('max_media_jobs_per_run',100))
+    progress=getattr(client,'collection_progress',None)
+    fetched={};cached={}
     for job in jobs:
+        key=(job['chat_id'],job['id']);payload=store.get(*key) or {}
+        kind=payload.get('media_kind')
+        if kind in ('photo','voice','round_video'):
+            path=original_path(state,job,payload,kind)
+            if path.is_file() and path.stat().st_size:cached[key]=(path,kind)
+    print(f'Очередь медиа на этот запуск: {len(jobs)}; оригиналов уже на диске: {len(cached)}.',flush=True)
+    for index,job in enumerate(jobs):
         cid,mid=job['chat_id'],job['id']
+        key=(cid,mid)
         partial=None
         try:
-            m=await client.get_messages(input_peer(allowed[cid]),ids=mid)
-            if not m:raise RuntimeError('Сообщение удалено или недоступно; медиа не получено.')
-            kind=media_kind(m)
-            if kind not in ('photo','voice','round_video'):raise RuntimeError('Тип медиа изменился; требуется повторное чтение сообщения.')
-            mime=getattr(getattr(m,'document',None),'mime_type','') or ''
-            ext='.jpg' if kind=='photo' and not getattr(m,'document',None) else ('.ogg' if kind=='voice' else '.mp4')
-            if kind=='photo' and mime:ext={ 'image/png':'.png','image/webp':'.webp','image/jpeg':'.jpg','image/gif':'.gif'}.get(mime,'.image')
-            original=Path(state)/'originals'/f'chat_{abs(cid)}'/f'{mid}_{job["fingerprint"]}{ext}'
+            if key in cached and not cached[key][0].is_file():cached.pop(key)
+            if key in cached:
+                original,kind=cached[key]
+                print(f'Медиа {index+1}/{len(jobs)}: используем сохранённый {kind}.',flush=True)
+            else:
+                if key not in fetched:
+                    ids=[j['id'] for j in jobs[index:] if j['chat_id']==cid
+                         and (cid,j['id']) not in fetched and (cid,j['id']) not in cached][:100]
+                    if progress:progress.set_phase(f'медиа: сведения о {len(ids)} вложениях одной порцией')
+                    print(f'Медиа: запрашиваем {len(ids)} сообщений одной порцией.',flush=True)
+                    try:
+                        batch=await client.get_messages(input_peer(allowed[cid]),ids=ids)
+                    except FloodWaitError:raise
+                    except Exception as error:
+                        # One failed batch must not become 100 identical requests.
+                        fetched.update({(cid,i):error for i in ids})
+                    else:
+                        mapped={m.id:m for m in batch if m is not None}
+                        fetched.update({(cid,i):mapped.get(i) for i in ids})
+                m=fetched[key]
+                if isinstance(m,Exception):raise m
+                if not m:raise RuntimeError('Сообщение удалено или недоступно; медиа не получено.')
+                kind=media_kind(m)
+                if kind not in ('photo','voice','round_video'):raise RuntimeError('Тип медиа изменился; требуется повторное чтение сообщения.')
+                mime=getattr(getattr(m,'document',None),'mime_type','') or ''
+                original=original_path(state,job,{'media_mime_type':mime},kind)
             original.parent.mkdir(parents=True,exist_ok=True)
-            if not original.exists():
+            if not original.exists() or not original.stat().st_size:
+                if progress:progress.set_phase(f'медиа {index+1}/{len(jobs)}: скачивание {kind}')
+                print(f'Медиа {index+1}/{len(jobs)}: скачиваем {kind}.',flush=True)
                 temp=original.with_name(original.name+'.download')
                 downloaded=await client.download_media(m,file=str(temp))
                 if not downloaded or not Path(downloaded).exists():raise RuntimeError('Telegram не вернул файл.')
@@ -115,13 +197,19 @@ async def process_jobs(client,store,chats,state,cfg):
             if not mirror.exists() or mirror.stat().st_size!=original.stat().st_size:
                 tmp=mirror.with_name(mirror.name+'.tmp');shutil.copyfile(original,tmp);os.replace(tmp,mirror)
             partial={'kind':kind,'original_relative_path':'originals/'+rel}
+            if progress:progress.set_phase(f'медиа {index+1}/{len(jobs)}: обработка {kind} на компьютере')
+            print(f'Медиа {index+1}/{len(jobs)}: оригинал сохранён, '
+                  + ('готовим фото.' if kind=='photo' else 'расшифровываем речь на компьютере.'),flush=True)
             result=await asyncio.to_thread(processor.process_file,original,kind,cid,mid,job['fingerprint'])
             result['original_relative_path']='originals/'+rel
             store.finish_job(cid,mid,result=result)
+            if progress:
+                progress.media_done+=1;progress.report(force=True)
             print(f'Медиа {mid}: {kind}, готово.',flush=True)
         except FloodWaitError as e:
             store.finish_job(cid,mid,result=partial,error=f'{type(e).__name__}: {e}')
             raise
         except Exception as e:
             store.finish_job(cid,mid,result=partial,error=f'{type(e).__name__}: {e}')
-            print(f'Медиа {mid}: ошибка {type(e).__name__}; будет повторено.',flush=True)
+            LOG.exception('Media job failed type=%s kind=%s',type(e).__name__,(store.get(cid,mid) or {}).get('media_kind'))
+            print(f'Медиа {mid}: ошибка {type(e).__name__}: {e}; будет повторено. Подробности: collector.log.',flush=True)

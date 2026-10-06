@@ -20,6 +20,8 @@ from tgreader.auth import verify_account
 from tgreader.collection_flow import CollectionClient, LOG, request_name
 from tgreader.common import iso, now
 from tgreader.store import Store
+from tgreader.media import MediaProcessor,process_jobs
+from test_reader import raw
 
 CHAT = {'chat_id': -100999, 'peer_type': 'channel', 'peer_id': 999,
         'access_hash': 123456789, 'forum': False, 'title': 'Offline group'}
@@ -61,6 +63,31 @@ def client_for(handler):
 
 
 class CollectionFlowTests(unittest.TestCase):
+    def test_real_telethon_fetches_100_media_descriptions_in_one_rpc(self):
+        messages=[types.Message(i,types.PeerChannel(999),now(),'offline',
+                    media=types.MessageMediaPhoto(types.Photo(i,1,b'offline',now(),[],2))) for i in range(1,101)]
+        requested=[]
+        def respond(request):
+            self.assertIsInstance(request,functions.channels.GetMessagesRequest)
+            requested.append([item.id for item in request.id])
+            return types.messages.Messages(messages,[],[],[])
+        client=client_for(respond)
+        async def download(message,file):Path(file).write_bytes(b'offline image');return file
+        client.download_media=AsyncMock(side_effect=download)
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);store=Store(root/'messages.sqlite3')
+            try:
+                for i in range(1,101):store.put(raw(i,kind='photo'))
+                with patch.object(MediaProcessor,'process_file',return_value={'assets':[]}), \
+                     contextlib.redirect_stdout(io.StringIO()),self.assertLogs(LOG,level='INFO') as logs:
+                    asyncio.run(process_jobs(client,store,[CHAT],root,{'output_dir':str(root/'output')}))
+                self.assertEqual(requested,[list(range(1,101))])
+                self.assertEqual(client.download_media.await_count,100)
+                self.assertFalse(store.pending_jobs([CHAT['chat_id']]))
+                self.assertIn('requested_messages=100 returned_messages=100','\n'.join(logs.output))
+                self.assertNotIn('123456789','\n'.join(logs.output))
+            finally:store.close()
+
     def test_short_limit_retries_exact_rpc_without_reconnect_or_secret_in_log(self):
         requests = []
         def respond(request):
@@ -182,6 +209,7 @@ class CollectionFlowTests(unittest.TestCase):
             self.assertEqual(status['chats'][0]['new_messages_last_run'], 201)
             self.assertTrue(list((root / 'output').glob('*.zip')))
             self.assertIn('Сбор завершён.', output.getvalue())
+            self.assertIn('новых сообщений 201, контекст 0',output.getvalue())
 
     def test_previous_short_pause_is_waited_before_connection(self):
         self.run_saved_pause(18, expect_result=0, expect_connection=True)

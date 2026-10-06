@@ -119,8 +119,8 @@
       "bytes": 6727
     },
     "tests/test_installer.ps1": {
-      "sha256": "7c5b8e4ffccd1f267b6ccab15879058e28d8e5dab181174678d8cf2801eef5d1",
-      "bytes": 4923
+      "sha256": "59eda2a2e8ba6d5758850138aa750a0c97a4566b66eef231d2c4690da155802a",
+      "bytes": 5161
     },
     "tests/test_login_fix.py": {
       "sha256": "50e6354a29fb65e9c0869600095197cd4cf3017e80cdcd2e827a7742369e9cee",

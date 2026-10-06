@@ -18,7 +18,9 @@ try {
     Assert-True ($result.ExitCode -eq -1) 'Missing executable does not terminate discovery'
     $arguments = @('C:\Users\Fullservis TG\Desktop\reader', 'quote " inside', 'C:\ending\', '')
     $result = Invoke-NativeProbe -Executable $TestPython -Arguments (@('-c','import sys,json; print(json.dumps(sys.argv[1:]))') + $arguments)
-    $actual = @(ConvertFrom-Json $result.Stdout)
+    # PowerShell 5.1 emits a JSON array as one object; wrapping it in @() nests it.
+    $actual = ConvertFrom-Json $result.Stdout
+    if ($result.ExitCode -ne 0 -or $actual.Count -ne 4) { Write-Host ('Probe stdout: ' + $result.Stdout); Write-Host ('Probe stderr: ' + $result.Stderr) }
     Assert-True ($result.ExitCode -eq 0 -and $actual.Count -eq 4 -and $actual[0] -ceq $arguments[0] -and $actual[1] -ceq $arguments[1] -and $actual[2] -ceq $arguments[2] -and $actual[3] -ceq '') 'Arguments with spaces, quotes, trailing slash and empty value survive'
     $result = Invoke-NativeProbe -Executable $TestPython -Arguments @('-c','import time; time.sleep(2)') -TimeoutMilliseconds 50
     Assert-True ($result.ExitCode -eq 124) 'Hung discovery process times out'

@@ -7,6 +7,7 @@ from telethon.errors import FloodWaitError
 from telethon.tl import functions, types
 from .common import UTC, iso, now
 from .collection_flow import LOG, request_name
+from .scope import cutoff as scope_cutoff,history_days,media_allowed,media_options
 
 def media_kind(m):
     if isinstance(getattr(m,'media',None),types.MessageMediaPhoto):return 'photo'
@@ -121,16 +122,26 @@ async def collect_chat(client,store,chat,cfg):
         tip=await client.get_messages(peer,limit=1)
         high=tip[0].id if tip else 0
         cursor=store.cursor(cid)
-        since=started-dt.timedelta(days=cfg.get('bootstrap_days',3))
-        if 'tracking_started_utc' not in health:health['tracking_started_utc']=iso(since)
+        days=history_days(cfg);since=scope_cutoff(cfg,started);read_cursor=cursor
+        last=store.db.execute('SELECT payload FROM messages WHERE chat_id=? AND context_only=0 '
+                              'AND id<=? ORDER BY id DESC LIMIT 1',(cid,cursor)).fetchone()
+        if (days>health.get('history_window_days',cfg.get('bootstrap_days',3)) or
+                (last and __import__('json').loads(last['payload'])['date_utc']<iso(since))):
+            read_cursor=0  # Backfill an expanded window, or skip an obsolete gap.
+        if not read_cursor or 'tracking_started_utc' not in health:health['tracking_started_utc']=iso(since)
+        print(f'{chat["title"]}: читаем последние {days} суток, начиная с '
+              f'{since.astimezone(ZoneInfo(cfg["timezone"])).strftime("%d.%m.%Y %H:%M")}.',flush=True)
+        def save_message(m,**options):
+            item=normalize(m,chat,catalog,cfg['timezone'])
+            return store.put(item,media_enabled=media_allowed(chat,item,cfg,started),**options)
         count=0
         if progress:progress.set_phase(f'{chat["title"]}: история, до 100 сообщений за запрос')
-        if high>cursor:
-            async for m in client.iter_messages(peer,limit=None,min_id=cursor,max_id=high+1,
-                    reverse=True,offset_date=since if not cursor else None,wait_time=1):
+        if high>read_cursor:
+            async for m in client.iter_messages(peer,limit=None,min_id=read_cursor,max_id=high+1,
+                    reverse=True,offset_date=since if not read_cursor else None,wait_time=1):
                 if not getattr(m,'date',None):continue
-                if not cursor and m.date<since:continue
-                store.put(normalize(m,chat,catalog,cfg['timezone']),advance=True)
+                if m.date<since:continue
+                if not save_message(m,advance=True):continue
                 count+=1
                 if progress:progress.saved()
                 elif count % 50 == 0:
@@ -151,23 +162,26 @@ async def collect_chat(client,store,chat,cfg):
             found=set()
             for m in parents:
                 if m and getattr(m,'date',None):
-                    found.add(m.id);store.put(normalize(m,chat,catalog,cfg['timezone']),context_only=True);context_count+=1
-                    if progress:progress.saved(context=True)
+                    found.add(m.id)
+                    if save_message(m,context_only=True):
+                        context_count+=1
+                        if progress:progress.saved(context=True)
             for mid in set(missing)-found:store.unavailable_context(cid,mid)
         # Refresh older records for edits. Messages just read from history
         # already have their current text: rereading them doubles first-run RPCs.
-        cutoff=now()-dt.timedelta(hours=cfg.get('edit_refresh_hours',48))
+        cutoff=max(since,now()-dt.timedelta(hours=cfg.get('edit_refresh_hours',48)))
         recent=[]
         for row in store.db.execute('SELECT id,payload FROM messages WHERE chat_id=? AND day>=?',(cid,cutoff.astimezone(ZoneInfo(cfg['timezone'])).date().isoformat())):
             payload=__import__('json').loads(row['payload'])
-            if row['id']<=cursor and payload['date_utc']>=iso(cutoff):recent.append(row['id'])
+            if read_cursor and row['id']<=cursor and payload['date_utc']>=iso(cutoff):recent.append(row['id'])
         for i in range(0,len(recent),100):
             if progress:progress.set_phase(f'{chat["title"]}: проверка правок, порция {len(recent[i:i+100])}')
             updates=await client.get_messages(peer,ids=recent[i:i+100])
             for m in updates:
-                if m and getattr(m,'date',None):store.put(normalize(m,chat,catalog,cfg['timezone']),context_only=True)
+                if m and getattr(m,'date',None):save_message(m,context_only=True)
         health.update({'collection_ok_utc':iso(started),'captured_tip_id':high,'cursor_id':store.cursor(cid),
                        'new_messages_last_run':count,'context_added_last_run':context_count,
+                       'history_window_days':days,'media_options':media_options(chat),
                        'tracking_started_utc':health['tracking_started_utc']})
         print(f'{chat["title"]}: новых сообщений {count}, контекст {context_count}',flush=True)
         LOG.info('Group collection finished new_messages=%s context=%s cursor=%s',count,context_count,store.cursor(cid))

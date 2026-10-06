@@ -12,6 +12,7 @@ from pathlib import Path
 from PIL import Image, ImageOps
 from .common import atomic_json, iso, now
 from .collection_flow import LOG
+from .scope import apply_queue_scope
 
 
 class PublicModelNotice(logging.Filter):
@@ -143,6 +144,7 @@ async def process_jobs(client,store,chats,state,cfg):
     from telethon.errors import FloodWaitError
     from .collector import input_peer,media_kind
     processor=MediaProcessor(state,cfg);allowed={c['chat_id']:c for c in chats}
+    apply_queue_scope(store,chats,cfg)
     jobs=store.pending_jobs(list(allowed),cfg.get('max_media_jobs_per_run',100))
     progress=getattr(client,'collection_progress',None)
     fetched={};cached={}
@@ -205,7 +207,7 @@ async def process_jobs(client,store,chats,state,cfg):
             store.finish_job(cid,mid,result=result)
             if progress:
                 progress.media_done+=1;progress.report(force=True)
-            print(f'Медиа {mid}: {kind}, готово.',flush=True)
+            print(f'Медиа {index+1}/{len(jobs)}: {kind}, готово (ID сообщения: {mid}).',flush=True)
         except FloodWaitError as e:
             store.finish_job(cid,mid,result=partial,error=f'{type(e).__name__}: {e}')
             raise

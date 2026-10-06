@@ -25,12 +25,14 @@ class Store:
         CREATE TABLE IF NOT EXISTS missing_context(chat_id INTEGER, id INTEGER,
             status TEXT DEFAULT 'pending', PRIMARY KEY(chat_id,id));
         ''')
+        if 'enabled' not in {row['name'] for row in self.db.execute('PRAGMA table_info(jobs)')}:
+            with self.db:self.db.execute('ALTER TABLE jobs ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1')
 
     def cursor(self, chat_id):
         row = self.db.execute('SELECT id FROM cursors WHERE chat_id=?', (chat_id,)).fetchone()
         return row['id'] if row else 0
 
-    def put(self, m, advance=False, context_only=False):
+    def put(self, m, advance=False, context_only=False, media_enabled=True):
         cid, mid = m['chat_id'], m['id']
         with self.db:
             old = self.db.execute('SELECT context_only,payload FROM messages WHERE chat_id=? AND id=?', (cid,mid)).fetchone()
@@ -44,12 +46,12 @@ class Store:
                             (cid,mid,m['day'],int(context_only),json.dumps(m,ensure_ascii=False)))
             fingerprint = m.get('media_fingerprint')
             if m.get('media_kind') in ('photo','voice','round_video'):
-                self.db.execute('''INSERT INTO jobs(chat_id,id,fingerprint,status) VALUES(?,?,?,'pending')
+                self.db.execute('''INSERT INTO jobs(chat_id,id,fingerprint,status,enabled) VALUES(?,?,?,'pending',?)
                 ON CONFLICT(chat_id,id) DO UPDATE SET
                   status=CASE WHEN fingerprint!=excluded.fingerprint THEN 'pending' ELSE status END,
                   result=CASE WHEN fingerprint!=excluded.fingerprint THEN NULL ELSE result END,
                   error=CASE WHEN fingerprint!=excluded.fingerprint THEN NULL ELSE error END,
-                  fingerprint=excluded.fingerprint''', (cid,mid,fingerprint))
+                  fingerprint=excluded.fingerprint,enabled=excluded.enabled''', (cid,mid,fingerprint,int(media_enabled)))
             else:
                 self.db.execute('DELETE FROM jobs WHERE chat_id=? AND id=?',(cid,mid))
             parent = m.get('reply_to_message_id')
@@ -58,6 +60,7 @@ class Store:
             self.db.execute('DELETE FROM missing_context WHERE chat_id=? AND id=?', (cid,mid))
             if advance:
                 self.db.execute('INSERT INTO cursors VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET id=MAX(id,excluded.id)', (cid,mid))
+        return old is None or bool(old['context_only'] and not context_only)
 
     def get(self, cid, mid):
         row = self.db.execute('SELECT payload FROM messages WHERE chat_id=? AND id=?', (cid,mid)).fetchone()
@@ -87,7 +90,7 @@ class Store:
         if not allowed_ids: return []
         slots=','.join('?' for _ in allowed_ids)
         # Failed jobs retry on the next run. A per-run budget never advances their status to done.
-        return [dict(r) for r in self.db.execute(f"SELECT * FROM jobs WHERE chat_id IN ({slots}) AND status!='done' ORDER BY attempts,id LIMIT ?", [*allowed_ids,limit])]
+        return [dict(r) for r in self.db.execute(f"SELECT * FROM jobs WHERE chat_id IN ({slots}) AND status!='done' AND enabled=1 ORDER BY attempts,id LIMIT ?", [*allowed_ids,limit])]
 
     def finish_job(self, cid, mid, result=None, error=None):
         with self.db:

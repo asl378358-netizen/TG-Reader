@@ -10,13 +10,16 @@ from .network import client_network_options
 from .credentials import read_password
 from .setup_flow import setup_dialogs
 from .dialog_picker import choose_dialogs
+from .scope import media_options
 
 
-def chat_records(dialogs):
-    return [{'chat_id':dialog.id,'title':dialog.name,
+def chat_records(dialogs,previous=()):
+    saved={chat['chat_id']:chat for chat in previous}
+    return [{**saved.get(dialog.id,{}),'chat_id':dialog.id,'title':dialog.name,
              'peer_type':'channel' if hasattr(dialog.entity,'access_hash') else 'chat',
              'peer_id':dialog.entity.id,'access_hash':getattr(dialog.entity,'access_hash',None),
-             'forum':bool(getattr(dialog.entity,'forum',False))} for dialog in dialogs]
+             'forum':bool(getattr(dialog.entity,'forum',False)),
+             'media':media_options(saved.get(dialog.id,{}))} for dialog in dialogs]
 
 
 async def select_groups():
@@ -28,7 +31,7 @@ async def select_groups():
         await client.connect();await verify_account(client,cfg);verified=True
         dialogs=await setup_dialogs(client,rpc_waits_handled=True)
         selected=choose_dialogs(dialogs,cfg['chats'],cfg['timezone'])
-        cfg['chats']=chat_records(selected)
+        cfg['chats']=chat_records(selected,cfg['chats'])
         atomic_json(state_dir()/'config.json',cfg)
         print(f'Список групп сохранён: {len(selected)}. Вход и папка выгрузок сохранены.',flush=True)
     finally:
@@ -56,21 +59,17 @@ async def setup():
         folder=filedialog.askdirectory(title='Выберите синхронизируемую папку Google Диска')
         root.destroy()
         if not folder:raise RuntimeError('Папка выгрузок не выбрана; настройка не завершена.')
-        output=Path(folder).resolve()/'TelegramDailyReader'
-        if output.is_relative_to(state.resolve()):raise RuntimeError('Выберите папку Google Диска, отдельно от данных программы.')
+        from .scope_settings import configure_scope,output_directory
+        output=output_directory(folder)
         output.mkdir(parents=True,exist_ok=True)
-        chats=[]
-        for d in choices:
-            e=d.entity
-            channel=hasattr(e,'access_hash')
-            chats.append({'chat_id':d.id,'title':d.name,'peer_type':'channel' if channel else 'chat',
-                          'peer_id':e.id,'access_hash':getattr(e,'access_hash',None),'forum':bool(getattr(e,'forum',False))})
+        chats=chat_records(choices,old.get('chats',[]))
         me=await client.get_me()
         cfg={**old,'auth_mode':'api','account_user_id':me.id,'api_id':api_id,'api_hash':api_hash,'chats':chats,'output_dir':str(output),
              'timezone':old.get('timezone','Europe/Berlin'),'bootstrap_days':old.get('bootstrap_days',3),
              'publish_days':7,'edit_refresh_hours':48,'max_media_jobs_per_run':100,
              'whisper_model':old.get('whisper_model','small'),'speech_language':old.get('speech_language','ru')}
         cfg.pop('auth_file',None)
+        cfg=configure_scope(cfg)
         atomic_json(p,cfg)
         print('\nНастройка сохранена. Выбрано групп:',len(chats))
         print('Папка материалов:',output)

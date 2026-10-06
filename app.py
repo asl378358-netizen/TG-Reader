@@ -22,11 +22,15 @@ async def collect():
     from tgreader.media import process_jobs
     from tgreader.packets import export_all
     from tgreader.store import Store
+    from tgreader.scope import apply_queue_scope,history_days
     cfg=load_config();state=state_dir();store=Store(state/'messages.sqlite3')
     client=None;verified=False;cooldown=state/'telegram_cooldown.json'
     phase='сохранённая пауза';result=0
     LOG.info('Collection started groups=%s',len(cfg['chats']))
     try:
+        apply_queue_scope(store,cfg['chats'],cfg)
+        print(f'Период чтения: последние {history_days(cfg)} суток. '
+              'Большие числа после «ID сообщения» — номера в Telegram.',flush=True)
         if cooldown.exists():
             saved=json.loads(cooldown.read_text(encoding='utf-8'))
             resume=dt.datetime.fromisoformat(saved['resume_utc'])
@@ -118,6 +122,9 @@ def main():
                 from tgreader.wizard import select_groups
                 asyncio.run(select_groups())
             elif command=='collect':return asyncio.run(collect())
+            elif command=='settings':
+                from tgreader.scope_settings import edit_scope
+                edit_scope()
             else:raise RuntimeError('Неизвестная команда.')
     except AlreadyRunning:
         print('Предыдущий сбор еще идет. Дождитесь его завершения.');return

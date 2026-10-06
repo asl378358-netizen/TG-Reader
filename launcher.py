@@ -39,7 +39,7 @@ def main():
     from tkinter import ttk
     window = tk.Tk()
     window.title('TG Reader')
-    window.geometry('760x650')
+    window.geometry('760x720')
     frame = ttk.Frame(window, padding=28); frame.pack(fill='both', expand=True)
     ttk.Label(frame, text='TG Reader', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
     status = tk.StringVar(value='Запускаю программу…')

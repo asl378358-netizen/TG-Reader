@@ -17,7 +17,7 @@ from telethon.sessions import MemorySession, StringSession
 
 from .auth import identity_client, save_desktop_bundle
 from .common import atomic_json, state_dir
-from .wizard import choose_dialogs
+from .wizard import chat_records,choose_dialogs
 from .network import client_network_options, connection_failed, detect_route
 from .credentials import read_password
 from .setup_flow import setup_dialogs, setup_rpc
@@ -248,24 +248,18 @@ async def setup_desktop():
             root.destroy()
         if not folder:
             raise RuntimeError('Папка выгрузок не выбрана; настройка отменена.')
-        output = Path(folder).resolve() / 'TelegramDailyReader'
-        if output.is_relative_to(state.resolve()):
-            raise RuntimeError('Выберите папку Google Диска отдельно от данных программы.')
+        from .scope_settings import configure_scope,output_directory
+        output = output_directory(folder)
         output.mkdir(parents=True, exist_ok=True)
-        chats = []
-        for dialog in choices:
-            entity = dialog.entity
-            chats.append({'chat_id': dialog.id, 'title': dialog.name,
-                'peer_type': 'channel' if hasattr(entity, 'access_hash') else 'chat',
-                'peer_id': entity.id, 'access_hash': getattr(entity, 'access_hash', None),
-                'forum': bool(getattr(entity, 'forum', False))})
-        auth_file = save_desktop_bundle(client, identity, me.id)
-        cfg = {**old, 'auth_mode': 'desktop', 'auth_file': auth_file, 'account_user_id': me.id,
+        chats = chat_records(choices,previous)
+        cfg = {**old, 'auth_mode': 'desktop', 'account_user_id': me.id,
             'chats': chats, 'output_dir': str(output), 'timezone': old.get('timezone', 'Europe/Berlin'),
             'bootstrap_days': old.get('bootstrap_days', 3), 'publish_days': 7,
             'edit_refresh_hours': 48, 'max_media_jobs_per_run': 100,
             'whisper_model': old.get('whisper_model', 'small'), 'speech_language': 'ru'}
         cfg.pop('api_id', None); cfg.pop('api_hash', None)
+        cfg=configure_scope(cfg)
+        cfg['auth_file']=save_desktop_bundle(client, identity, me.id)
         atomic_json(config_path, cfg); committed = True
         print('\nНастройка сохранена. Выбрано групп:', len(chats))
         print('Теперь нажмите «Собрать сейчас». Автосбор включайте после проверки выгрузки.')

@@ -18,7 +18,7 @@ class ReaderWindow:
         self.busy = False
         self.queue = queue.Queue()
         self.buttons = []
-        window.title('TG Reader'); window.minsize(700, 640)
+        window.title('TG Reader'); window.minsize(700, 700)
         frame = ttk.Frame(window, padding=22); frame.pack(fill='both', expand=True)
         ttk.Label(frame, text='TG Reader', font=('Segoe UI', 22, 'bold')).pack(anchor='w')
         self.version = tk.StringVar(value='Версия ' + record['version'])
@@ -29,6 +29,7 @@ class ReaderWindow:
         for text, callback in [
             ('Подключить Telegram / выбрать группы', lambda: self.job('setup-desktop')),
             ('Изменить выбранные группы', lambda: self.job('select-groups')),
+            ('Период и медиа', lambda: self.job('settings')),
             ('Собрать сейчас', lambda: self.job('collect')),
             ('Открыть состояние', self.open_status),
             ('Открыть папку выгрузок', self.open_exports),
@@ -58,7 +59,7 @@ class ReaderWindow:
 
     def job(self, command):
         if self.busy: return
-        if command in ('collect', 'schedule-enable', 'select-groups') and not (self.root / 'config.json').exists():
+        if command in ('collect', 'schedule-enable', 'select-groups','settings') and not (self.root / 'config.json').exists():
             messagebox.showinfo('TG Reader', 'Сначала подключите Telegram и выберите группы.'); return
         self.busy = True
         for button in self.buttons: button.state(['disabled'])
@@ -80,7 +81,7 @@ class ReaderWindow:
                                  '-File', str(self.source / 'schedule.ps1'), '-Mode', mode]
                 else:
                     arguments = [self.record['python'], str(self.source / 'app.py'), command]
-                label = 'Настройка Telegram…' if command == 'setup-desktop' else ('Выбор групп…' if command == 'select-groups' else 'Выполняю сбор…')
+                label = 'Настройка Telegram…' if command == 'setup-desktop' else ('Выбор групп…' if command == 'select-groups' else ('Период и медиа…' if command=='settings' else 'Выполняю сбор…'))
                 self.queue.put(('status', label))
                 flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
                 process = subprocess.Popen(arguments, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

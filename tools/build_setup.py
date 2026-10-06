@@ -31,7 +31,7 @@ def build():
              'bytes': path.stat().st_size} for path in paths}
     manifest = {'schema': 1, 'version': VERSION, 'files': files}
     manifest_path = ROOT / 'update-manifest.json'
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    manifest_path.write_bytes((json.dumps(manifest, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
     blob = io.BytesIO()
     # Stored entries make the installer identical across Python/zlib and OS versions.
     with zipfile.ZipFile(blob, 'w', zipfile.ZIP_STORED) as archive:

@@ -191,8 +191,8 @@
       "bytes": 6229
     },
     "tools/build_setup.py": {
-      "sha256": "6535f635f2ff511a6831d7bb43c1f958611e3f2f34e5a0acb8a545e43922aef8",
-      "bytes": 3272
+      "sha256": "51d711f12ffeb2880467447d38d3c826c3c968f683cf51d2c4a67dc74bd655d3",
+      "bytes": 3273
     },
     "tools/promote_stable.py": {
       "sha256": "5723d391825426c7045efa189fbdf057423c9c4844a58e8a4aab10fafd5ca664",

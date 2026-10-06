@@ -71,6 +71,50 @@ def choose_tdata():
     return result
 
 
+def load_desktop(path, password_callback=None):
+    """Read local data first without a passcode; no Telegram requests or disk writes."""
+    API, _, TDesktop = desktop_dependencies()
+    from opentele2.exception import OpenTeleException, TDataBadDecryptKey
+    password_callback = password_callback or read_password
+    message = ('Это код блокировки Telegram Desktop на этом компьютере. '
+        'Он запрашивается при открытии заблокированного приложения.\n'
+        'Облачный пароль двухэтапной проверки вводится позже, после выбора аккаунта.\n'
+        'Если Desktop открывается без отдельного кода, нажмите «Отмена» и проверьте '
+        'выбранную папку tdata; сообщение об ошибке само по себе не доказывает, что код установлен.\n'
+        f'Папка: {path}')
+    passcode = None
+    for attempt in range(4):
+        try:
+            desktop = TDesktop(str(path), api=API.TelegramDesktop, passcode=passcode)
+        except TDataBadDecryptKey:
+            if attempt == 3:
+                raise RuntimeError('Локальные данные tdata не открылись после трёх попыток. '
+                    'Проверьте код блокировки именно этого Telegram Desktop и выбранную папку. '
+                    'Облачный пароль аккаунта для расшифровки tdata не используется.') from None
+            hint = ('Данные не открылись без кода блокировки.' if attempt == 0 else
+                    'Введённый код не открыл выбранную tdata. Можно повторить ввод.')
+        except UnicodeEncodeError:
+            if attempt == 3:
+                raise RuntimeError('Библиотека чтения Desktop не поддерживает символы введённого '
+                    'локального кода. Облачный пароль сюда вводить не требуется.') from None
+            hint = 'Библиотека чтения Desktop не поддерживает некоторые символы введённого локального кода.'
+        except (Exception, OpenTeleException) as exc:
+            raise RuntimeError('Не удалось прочитать выбранную папку tdata. Полностью закройте '
+                'Telegram Desktop через значок у часов и проверьте папку активной установки. '
+                'Тип ошибки: ' + type(exc).__name__) from None
+        else:
+            if not desktop.isLoaded() or not desktop.accounts:
+                raise RuntimeError('В выбранной tdata не найден авторизованный аккаунт. '
+                    'Выберите папку того Telegram Desktop, в котором выполнен вход.')
+            print('Локальные данные Telegram Desktop прочитаны.', flush=True)
+            return desktop
+        finally:
+            passcode = None
+        passcode = password_callback('Код блокировки Telegram Desktop на этом компьютере',
+                                    message, allow_empty=False, error=hint)
+    raise AssertionError('Unreachable')
+
+
 async def connect_account(account, use_current, network=None):
     network = network if network is not None else detect_route()
     from opentele2.exception import OpenTeleException
@@ -159,21 +203,8 @@ async def setup_desktop():
     network = detect_route()
     print('Маршрут Telegram:', network.description, flush=True)
     path = choose_tdata()
-    API, use_current, TDesktop = desktop_dependencies()
-    from opentele2.exception import OpenTeleException
-    local_passcode = read_password('Локальный код-пароль Telegram Desktop',
-        'Введите код-пароль, которым разблокируется Telegram Desktop на этом компьютере. '
-        'Если код-пароль не установлен, оставьте поле пустым и нажмите «Продолжить».',
-        allow_empty=True)
-    try:
-        desktop = TDesktop(str(path), api=API.TelegramDesktop, passcode=local_passcode or None)
-    except (Exception, OpenTeleException) as exc:
-        raise RuntimeError('Не удалось прочитать tdata. Проверьте локальный код-пароль и папку. '
-                           'Возможна несовместимость версии Desktop. Тип ошибки: '+type(exc).__name__) from None
-    finally:
-        local_passcode = None
-    if not desktop.isLoaded() or not desktop.accounts:
-        raise RuntimeError('В tdata не найден авторизованный аккаунт.')
+    desktop = load_desktop(path)
+    API, use_current, _ = desktop_dependencies()
 
     accounts = desktop.accounts
     bootstrap = None; client = None; committed = False

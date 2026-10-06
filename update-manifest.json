@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "files": {
     ".gitattributes": {
       "sha256": "6e3cd734f4c7fb87509b27c0199dd8eb78f542825935bcc0fdfc07f0866c9a4e",
@@ -75,16 +75,16 @@
       "bytes": 3613
     },
     "README.md": {
-      "sha256": "612085f968b74fcd04d2a866b02d3f348d1168603b56450ab47577a98e20f838",
-      "bytes": 5761
+      "sha256": "da7b2b509b357a650f9d29fe52e1b0fea564e4cf7e8c2d461ff18afc016a4cac",
+      "bytes": 6239
     },
     "START_HERE.txt": {
-      "sha256": "c5b24628b63c4e0cc20785c2f334310829dceb74947d00a751cc606fc783b6d3",
-      "bytes": 2075
+      "sha256": "ab80e0f1e636e80ce8fe7761cfe3e0c22745ffdb8fa515820d849410aa80b1db",
+      "bytes": 2435
     },
     "VALIDATION.txt": {
-      "sha256": "7b3fb6b4c48fe6dec78b72381d3c74974587a58bf22319e79eea2c8e63114ab7",
-      "bytes": 16564
+      "sha256": "029468bd161c0b026e472bb4982f8d8597c247687dc6c9d492846770c60274a5",
+      "bytes": 17935
     },
     "VENDOR_NOTICES.txt": {
       "sha256": "7120085ecca750b1b5e1aa1f2e42e4930dd06547403693c2c5600bf27f3b6bc1",
@@ -121,6 +121,10 @@
     "tests/test_installer.ps1": {
       "sha256": "59eda2a2e8ba6d5758850138aa750a0c97a4566b66eef231d2c4690da155802a",
       "bytes": 5161
+    },
+    "tests/test_local_tdata.py": {
+      "sha256": "573f22694c82d4fb671a0c524d95eed538c63352fb1e5a5bd93a91841fc6337d",
+      "bytes": 5883
     },
     "tests/test_login_fix.py": {
       "sha256": "50e6354a29fb65e9c0869600095197cd4cf3017e80cdcd2e827a7742369e9cee",
@@ -159,8 +163,8 @@
       "bytes": 5560
     },
     "tgreader/desktop.py": {
-      "sha256": "98a404333f81b904103cdcbac0666df37497308b4a5d83096c5ff73991b1d9b7",
-      "bytes": 13654
+      "sha256": "13bcc93aef8228a6246df8c1a7602ce035e32d285aa4994f521d901b3e5fd47f",
+      "bytes": 16181
     },
     "tgreader/media.py": {
       "sha256": "b0e88dd005c6fbb0386588157eeb0e05e19ebd397d5285da75a0c3f6e387af01",
@@ -191,7 +195,7 @@
       "bytes": 6229
     },
     "tools/build_setup.py": {
-      "sha256": "51d711f12ffeb2880467447d38d3c826c3c968f683cf51d2c4a67dc74bd655d3",
+      "sha256": "b387ed7ebad2779cbdd035809f30dc3a6b6d6a7dd933e6abf18626341632b302",
       "bytes": 3273
     },
     "tools/promote_stable.py": {

@@ -181,17 +181,14 @@ function Select-ExistingPython {
 
 function Invoke-LoggedNative {
     param([string]$Executable, [string[]]$Arguments)
-    # PS 5.1 turns redirected stderr into ErrorRecords. Capture it without Stop,
-    # then decide success from the executable's exit code.
-    $previousPreference = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        & $Executable @Arguments 2>&1 | ForEach-Object { Write-InstallMessage ([string]$_) }
-        $nativeExit = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $previousPreference
+    # Use explicit CRT quoting: PowerShell 5.1 rewrites quotes in native arguments.
+    $result = Invoke-NativeProbe -Executable $Executable -Arguments $Arguments -TimeoutMilliseconds 1200000
+    foreach ($stream in @($result.Stdout, $result.Stderr)) {
+        foreach ($line in ($stream -split "`r?`n")) {
+            if ($line.Length) { Write-InstallMessage $line }
+        }
     }
-    if ($nativeExit -ne 0) { throw "Command failed with exit code $nativeExit. See install.log." }
+    if ($result.ExitCode -ne 0) { throw ("Command failed with exit code " + $result.ExitCode + ". See install.log.") }
 }
 
 function Install-Reader {

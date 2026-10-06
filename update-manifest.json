@@ -3,8 +3,8 @@
   "version": "0.3.0",
   "files": {
     ".gitattributes": {
-      "sha256": "1bf2db8dc8b9f808d2a79f570dafeb194eddf90c0e04efb0eb43791dc081c3f1",
-      "bytes": 108
+      "sha256": "6e3cd734f4c7fb87509b27c0199dd8eb78f542825935bcc0fdfc07f0866c9a4e",
+      "bytes": 122
     },
     ".github/workflows/windows.yml": {
       "sha256": "045b1bdcaeeeb0f436bcbf9065a8fa078c9fb4741a4fa9d76faf8532520d2067",
@@ -191,8 +191,8 @@
       "bytes": 6229
     },
     "tools/build_setup.py": {
-      "sha256": "cc3a42afc39769b5447bd84ffde5d05a5b200571de188c1cac4513217e51979b",
-      "bytes": 3172
+      "sha256": "6535f635f2ff511a6831d7bb43c1f958611e3f2f34e5a0acb8a545e43922aef8",
+      "bytes": 3272
     },
     "tools/promote_stable.py": {
       "sha256": "5723d391825426c7045efa189fbdf057423c9c4844a58e8a4aab10fafd5ca664",

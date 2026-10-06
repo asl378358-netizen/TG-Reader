@@ -33,10 +33,12 @@ def build():
     manifest_path = ROOT / 'update-manifest.json'
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     blob = io.BytesIO()
-    with zipfile.ZipFile(blob, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    # Stored entries make the installer identical across Python/zlib and OS versions.
+    with zipfile.ZipFile(blob, 'w', zipfile.ZIP_STORED) as archive:
         for path in paths + [manifest_path]:
             info = zipfile.ZipInfo('TG-Reader/' + path.relative_to(ROOT).as_posix(), date_time=(2026, 10, 6, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
+            info.create_system = 3
             info.external_attr = 0o100644 << 16
             archive.writestr(info, path.read_bytes())
     data = blob.getvalue()

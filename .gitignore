@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.log
+*.enc
+*.sqlite3*
+config.json
+current.json
+.test_state/
+.venv/
+venv/
+envs/
+versions/
+originals/
+upload_payload.json

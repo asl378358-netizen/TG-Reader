@@ -1,0 +1,50 @@
+name: Windows checks and stable update
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: windows-main
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+      - name: Dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip check
+      - name: Reader and updater tests
+        env:
+          OPENTELE_NO_FETCH: '1'
+        run: |
+          python -m compileall -q app.py launcher.py update_client.py winlaunch.py tgreader tools tests
+          python -m unittest discover -s tests -p "test_*.py"
+      - name: Deterministic setup and manifest
+        run: |
+          python tools/build_setup.py
+          git diff --exit-code -- update-manifest.json TG-Reader-Setup.cmd
+      - name: Windows PowerShell 5.1 installer regressions
+        shell: powershell
+        run: |
+          & .\tests\test_installer.ps1 -TestPython (Get-Command python).Source
+      - name: Real CMD bootstrap, repeated setup and shortcuts
+        shell: powershell
+        env:
+          OPENTELE_NO_FETCH: '1'
+        run: |
+          & .\tests\test_bootstrap.ps1 -TestPython (Get-Command python).Source
+      - name: Publish tested commit to stable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/promote_stable.py

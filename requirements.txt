@@ -1,0 +1,17 @@
+Telethon==1.45.0
+opentele2==1.2.1
+TgCrypto-pyrofork==1.2.8
+selectolax==1.0.0
+faster-whisper==1.2.1
+av==16.1.0
+Pillow==12.3.0
+tzdata==2026.5
+huggingface-hub==1.33.0
+ctranslate2==4.8.2
+numpy==2.5.3; python_version >= "3.12"
+numpy==2.2.6; python_version < "3.12"
+tokenizers==0.23.2
+onnxruntime==1.30.0; python_version >= "3.11"
+onnxruntime==1.23.2; python_version < "3.11"
+httpx[socks]==0.28.1
+python-socks[asyncio]==2.8.2
